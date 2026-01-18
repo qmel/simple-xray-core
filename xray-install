@@ -1,8 +1,23 @@
 #!/bin/bash
-echo "Будет установлен Vless с транспортом TCP"
+
+xraytype="$1"
+case "$xraytype" in
+    "vless-tcp")
+        linkstr="\"\$protocol://\$uuid@\$ip:\$port?security=reality&sni=\$sni&fp=firefox&pbk=\$pbk&sid=\$sid&spx=/&type=tcp&flow=xtls-rprx-vision&encryption=none\""
+        newuser2config="jq --arg email \"\$email\" --arg uuid \"\$uuid\" '.inbounds[0].settings.clients += [{\"email\": \$email, \"id\": \$uuid, \"flow\": \"xtls-rprx-vision\"}]' /usr/local/etc/xray/config.json > tmp.json && mv tmp.json /usr/local/etc/xray/config.json"
+        ;;
+    "vless-xhttp")
+        linkstr="\"\$protocol://\$uuid@\$ip:\$port?security=reality&path=%2F&host=&mode=auto&sni=\$sni&fp=firefox&pbk=\$pbk&sid=\$sid&spx=%2F&type=xhttp&encryption=none\""
+        newuser2config="jq --arg email \"\$email\" --arg uuid \"\$uuid\" '.inbounds[0].settings.clients += [{\"email\": \$email, \"id\": \$uuid, \"flow\": \"\"}]' /usr/local/etc/xray/config.json > tmp.json && mv tmp.json /usr/local/etc/xray/config.json"
+        ;;
+    *)
+        echo "Usage: ./xray-install (vless-tcp, vless-xhttp)" 
+        exit 1
+        ;;
+esac
+
+echo "Будет установлен Vless с транспортом $xraytype"
 sleep 3
-apt update
-apt install qrencode curl jq -y
 
 # Включаем bbr
 bbr=$(sysctl -a | grep net.ipv4.tcp_congestion_control)
@@ -15,101 +30,30 @@ sysctl -p
 echo "bbr включен"
 fi
 
-# Устанавливаем ядро Xray
-bash -c "$(curl -4 -L https://github.com/XTLS/Xray-install/raw/main/install-release.sh)" @ install
+# Устанавливаем ядро Xray, если оно не установлено
+systemctl stop xray
+if [ $? -ne 0 ]; then
+    apt update
+    apt install qrencode curl jq -y
+    bash -c "$(curl -4 -L https://github.com/XTLS/Xray-install/raw/main/install-release.sh)" @ install
+fi
+
+# Удаляем старые, генерируем новый ключ
 [ -f /usr/local/etc/xray/.keys ] && rm /usr/local/etc/xray/.keys
 touch /usr/local/etc/xray/.keys
 echo "shortsid: $(openssl rand -hex 8)" >> /usr/local/etc/xray/.keys
 echo "uuid: $(xray uuid)" >> /usr/local/etc/xray/.keys
 xray x25519 >> /usr/local/etc/xray/.keys
 
-export uuid=$(cat /usr/local/etc/xray/.keys | awk -F': ' '/uuid/ {print $2}')
-export privatkey=$(cat /usr/local/etc/xray/.keys | awk -F': ' '/PrivateKey/ {print $2}')
-export shortsid=$(cat /usr/local/etc/xray/.keys | awk -F': ' '/shortsid/ {print $2}')
+uuid=$(cat /usr/local/etc/xray/.keys | awk -F': ' '/uuid/ {print $2}')
+privatekey=$(cat /usr/local/etc/xray/.keys | awk -F': ' '/PrivateKey/ {print $2}')
+shortsid=$(cat /usr/local/etc/xray/.keys | awk -F': ' '/shortsid/ {print $2}')
 
-# Создаем файл конфигурации Xray
-touch /usr/local/etc/xray/config.json
-cat << EOF > /usr/local/etc/xray/config.json
-{
-    "log": {
-        "loglevel": "warning"
-    },
-    "routing": {
-        "domainStrategy": "IPIfNonMatch",
-        "rules": [
-            {
-                "type": "field",
-                "domain": [
-                    "geosite:category-ads-all"
-                ],
-                "outboundTag": "block"
-            }
-        ]
-    },
-    "inbounds": [
-        {
-            "listen": "0.0.0.0",
-            "port": 443,
-            "protocol": "vless",
-            "settings": {
-                "clients": [
-                    {
-                        "email": "main",
-                        "id": "$uuid",
-                        "flow": "xtls-rprx-vision"
-                    }
-                ],
-                "decryption": "none"
-            },
-            "streamSettings": {
-                "network": "tcp",
-                "security": "reality",
-                "realitySettings": {
-                    "show": false,
-                    "dest": "github.com:443",
-                    "xver": 0,
-                    "serverNames": [
-                        "github.com",
-                        "www.github.com"
-                    ],
-                    "privateKey": "$privatkey",
-                    "minClientVer": "",
-                    "maxClientVer": "",
-                    "maxTimeDiff": 0,
-                    "shortIds": [
-                        "$shortsid"
-                    ]
-                }
-            },
-            "sniffing": {
-                "enabled": true,
-                "destOverride": [
-                    "http",
-                    "tls"
-                ]
-            }
-        }
-    ],
-    "outbounds": [
-        {
-            "protocol": "freedom",
-            "tag": "direct"
-        },
-        {
-            "protocol": "blackhole",
-            "tag": "block"
-        }
-    ],
-    "policy": {
-        "levels": {
-            "0": {
-                "handshake": 3,
-                "connIdle": 180
-            }
-        }
-    }
-}
-EOF
+# Создаем файл конфигурации Xray, подставляя значения переменных в шаблоны
+jq --arg uuid "$uuid" --arg privatekey "$privatekey" --arg shortsid "$shortsid" \
+    '.inbounds[0].settings.clients[0].id=$uuid | .inbounds[0].streamSettings.realitySettings.privateKey=$privatekey | .inbounds[0].streamSettings.realitySettings.shortIds[0]=$shortsid' \
+    "./config-${xraytype}.json" > /usr/local/etc/xray/config.json || exit 3
+
 
 # Исполняемый файл для списка клиентов
 touch /usr/local/bin/userlist
@@ -129,27 +73,6 @@ done
 EOF
 chmod +x /usr/local/bin/userlist
 
-# исполняемый файл для ссылки основного пользователя
-touch /usr/local/bin/mainuser
-cat << 'EOF' > /usr/local/bin/mainuser
-#!/bin/bash
-protocol=$(jq -r '.inbounds[0].protocol' /usr/local/etc/xray/config.json)
-port=$(jq -r '.inbounds[0].port' /usr/local/etc/xray/config.json)
-uuid=$(cat /usr/local/etc/xray/.keys | awk -F': ' '/uuid/ {print $2}')
-pbk=$(cat /usr/local/etc/xray/.keys | awk -F': ' '/Password/ {print $2}')
-sid=$(cat /usr/local/etc/xray/.keys | awk -F': ' '/shortsid/ {print $2}')
-sni=$(jq -r '.inbounds[0].streamSettings.realitySettings.serverNames[0]' /usr/local/etc/xray/config.json)
-ip=$(timeout 3 curl -4 -s icanhazip.com)
-link="$protocol://$uuid@$ip:$port?security=reality&sni=$sni&fp=firefox&pbk=$pbk&sid=$sid&spx=/&type=tcp&flow=xtls-rprx-vision&encryption=none#vless-$ip"
-echo ""
-echo "Ссылка для подключения":
-echo "$link"
-echo ""
-echo "QR-код:"
-echo ${link} | qrencode -t ansiutf8
-EOF
-chmod +x /usr/local/bin/mainuser
-
 # Исполняемый файл для создания новых клиентов
 touch /usr/local/bin/newuser
 cat << 'EOF' > /usr/local/bin/newuser
@@ -164,7 +87,9 @@ user_json=$(jq --arg email "$email" '.inbounds[0].settings.clients[] | select(.e
 
 if [[ -z "$user_json" ]]; then
 uuid=$(xray uuid)
-jq --arg email "$email" --arg uuid "$uuid" '.inbounds[0].settings.clients += [{"email": $email, "id": $uuid, "flow": "xtls-rprx-vision"}]' /usr/local/etc/xray/config.json > tmp.json && mv tmp.json /usr/local/etc/xray/config.json
+EOF
+echo $newuser2config >> /usr/local/bin/newuser
+cat << 'EOF' >> /usr/local/bin/newuser
 systemctl restart xray
 index=$(jq --arg email "$email" '.inbounds[0].settings.clients | to_entries[] | select(.value.email == $email) | .key'  /usr/local/etc/xray/config.json)
 protocol=$(jq -r '.inbounds[0].protocol' /usr/local/etc/xray/config.json)
@@ -175,7 +100,9 @@ sid=$(cat /usr/local/etc/xray/.keys | awk -F': ' '/shortsid/ {print $2}')
 username=$(jq --argjson index "$index" -r '.inbounds[0].settings.clients[$index].email' /usr/local/etc/xray/config.json)
 sni=$(jq -r '.inbounds[0].streamSettings.realitySettings.serverNames[0]' /usr/local/etc/xray/config.json)
 ip=$(curl -4 -s icanhazip.com)
-link="$protocol://$uuid@$ip:$port?security=reality&sni=$sni&fp=firefox&pbk=$pbk&sid=$sid&spx=/&type=tcp&flow=xtls-rprx-vision&encryption=none#$username"
+EOF
+echo "link=$linkstr" >> /usr/local/bin/newuser
+cat << 'EOF' >> /usr/local/bin/newuser
 echo ""
 echo "Ссылка для подключения":
 echo "$link"
@@ -252,7 +179,9 @@ sid=$(cat /usr/local/etc/xray/.keys | awk -F': ' '/shortsid/ {print $2}')
 username=$(jq --argjson index "$index" -r '.inbounds[0].settings.clients[$index].email' /usr/local/etc/xray/config.json)
 sni=$(jq -r '.inbounds[0].streamSettings.realitySettings.serverNames[0]' /usr/local/etc/xray/config.json)
 ip=$(curl -4 -s icanhazip.com)
-link="$protocol://$uuid@$ip:$port?security=reality&sni=$sni&fp=firefox&pbk=$pbk&sid=$sid&spx=/&type=tcp&flow=xtls-rprx-vision&encryption=none#$username"
+EOF
+echo "link=$linkstr" >> /usr/local/bin/sharelink
+cat << 'EOF' >> /usr/local/bin/sharelink
 echo ""
 echo "Ссылка для подключения":
 echo "$link"
@@ -265,28 +194,6 @@ chmod +x /usr/local/bin/sharelink
 systemctl restart xray
 
 echo "Xray-core успешно установлен"
-mainuser
-
-# Создаем файл с подсказками
-touch $HOME/help
-cat << 'EOF' > $HOME/help
-
-Команды для управления пользователями Xray:
-
-    mainuser - выводит ссылку для подключения основного пользователя
-    newuser - создает нового пользователя
-    rmuser - удаление пользователей
-    sharelink - выводит список пользователей и позволяет создать для них ссылки для подключения
-    userlist - выводит список клиентов
+echo "Для получения ссылки и QR-кода введите \`sharelink\`"
 
 
-
-Файл конфигурации находится по адресу:
-
-    /usr/local/etc/xray/config.json
-
-Команда для перезагрузки ядра Xray:
-
-    systemctl restart xray
-
-EOF
