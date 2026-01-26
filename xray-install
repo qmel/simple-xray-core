@@ -20,14 +20,23 @@ echo "Будет установлен Vless с транспортом $xraytype"
 sleep 3
 
 # Включаем bbr
-bbr=$(sysctl -a | grep net.ipv4.tcp_congestion_control)
+bbr=$(sysctl net.ipv4.tcp_congestion_control)
 if [ "$bbr" = "net.ipv4.tcp_congestion_control = bbr" ]; then
 echo "bbr уже включен"
 else
-echo "net.core.default_qdisc=fq" >> /etc/sysctl.conf
 echo "net.ipv4.tcp_congestion_control=bbr" >> /etc/sysctl.conf
 sysctl -p
 echo "bbr включен"
+fi
+
+# Устанавливаем нужный qdisc
+qdisc=$(sysctl net.core.default_qdisc)
+if [ "$qdisc" = "net.core.default_qdisc = fq" ]; then
+echo "qdisc=fq уже установлен"
+else
+echo "net.core.default_qdisc=fq" >> /etc/sysctl.conf
+sysctl -p
+echo "qdisc=fq установлен"
 fi
 
 # Устанавливаем ядро Xray, если оно не установлено
