@@ -11,6 +11,12 @@
                     "geosite:private"
                 ],
                 "outboundTag": "block"
+            },
+            {
+                "ip": [
+                    "geoip:private"
+                ],
+                "outboundTag": "block"
             }
         ]
     },
@@ -65,13 +71,5 @@
             "protocol": "blackhole",
             "tag": "block"
         }
-    ],
-    "policy": {
-        "levels": {
-            "0": {
-                "handshake": 3,
-                "connIdle": 180
-            }
-        }
-    }
+    ]
 }
