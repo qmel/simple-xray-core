@@ -17,7 +17,7 @@
 ```sh
 git clone https://github.com/qmel/simple-xray-core.git
 cd simple-xray-core
-./xray-install vless-tcp
+sudo ./xray-install vless-tcp
 ```
 Поддерживаемые протоколы
 - `vless-tcp` (Vless TCP)
