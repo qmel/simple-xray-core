@@ -39,11 +39,13 @@ sysctl -p
 echo "qdisc=fq установлен"
 fi
 
+# Устанавливаем необходимые пакеты
+apt install qrencode curl jq -y
+
 # Устанавливаем ядро Xray, если оно не установлено
 systemctl stop xray
 if [ $? -ne 0 ]; then
     apt update
-    apt install qrencode curl jq -y
     bash -c "$(curl -4 -L https://github.com/XTLS/Xray-install/raw/main/install-release.sh)" @ install
 fi
 
