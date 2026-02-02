@@ -7,17 +7,22 @@
 - 1 CPU  
 - 1 GB RAM  
 - 10 GB диска  
-- ОС Ubuntu 22 x64 или Ubuntu 24 x64
 
 
 ## Как пользоваться скриптом
-Скрипт создавался и тестировался под ОС Ubuntu 22 x64 и Ubuntu 24 x64. На других ОС может работать некорректно.
-Сколонируйте репозиторий, перейдите в его корневую директорию и запустите скрипт установки с соответвующим 
+Скрипт тестировался под ОС Ubuntu 22, 24, Debian 11. На других ОС может работать некорректно.  
+Склонируйте репозиторий, перейдите в его корневую директорию и запустите скрипт установки с соответвующим 
 протоколом, например:
 ```sh
 git clone https://github.com/qmel/simple-xray-core.git
 cd simple-xray-core
 sudo ./xray-install vless-tcp
+```
+Добавьте пользователя, перезапустите сервис и выведите ссылку и QR-код для подключения:
+```sh
+xray-user -add username
+sudo systemctl restart xray
+xray-user -link username
 ```
 Поддерживаемые протоколы
 - `vless-tcp` (Vless TCP)
@@ -32,25 +37,25 @@ sudo ./xray-install vless-tcp
 **Вывести список всех клиентов:**
 
 ```sh
-userlist
+xray-user -show
 ```
 
 **Создать нового пользователя:**
 
 ```sh
-newuser
+xray-user -add username
 ```
 
 **Удалить пользователя:**
 
 ```sh
-rmuser
+xray-user -rm username [-f]
 ```
 
 **Вывести ссылку и QR-код для подключения пользователя:**
 
 ```sh
-sharelink
+xray-user -link username
 ```
 
 **Команда для перезагрузки ядра Xray**:
@@ -113,9 +118,7 @@ systemctl restart xray
 bash -c "$(curl -L https://github.com/XTLS/Xray-install/raw/main/install-release.sh)" @ remove
 rm /usr/local/etc/xray/config.json
 rm /usr/local/etc/xray/.keys
-rm /usr/local/bin/userlist
-rm /usr/local/bin/newuser
-rm /usr/local/bin/rmuser
-rm /usr/local/bin/sharelink
+rm /usr/local/etc/xray/.users.json
+rm /usr/local/bin/xray-user
 ```
 и удалите склонированный репозиторий
