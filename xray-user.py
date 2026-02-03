@@ -217,6 +217,11 @@ def show_link(username: str):
             sharelinks = inbound.get_sharelinks()
             if username in sharelinks:
                 print(sharelinks[username])
+                with suppress(FileNotFoundError):
+                    subprocess.run(["qrencode", "-t", "ansiutf8", sharelinks[username]], 
+                        stderr = subprocess.DEVNULL,
+                    )
+                print()
     else:
         sys.stderr.write(f"User '{username}' was not found in Xray inbounds config\n")
         sys.exit(3)
