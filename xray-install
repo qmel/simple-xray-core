@@ -45,12 +45,17 @@ if [ $? -ne 0 ]; then
     bash -c "$(curl -4 -L https://github.com/XTLS/Xray-install/raw/main/install-release.sh)" @ install
 fi
 
-# Удаляем старые, генерируем новый ключ
-[ -f /usr/local/etc/xray/.keys ] && rm /usr/local/etc/xray/.keys
-touch /usr/local/etc/xray/.keys
-xray x25519 >> /usr/local/etc/xray/.keys
-
+# Генерируем ключи для сервера, если их нет
 privatekey=$(cat /usr/local/etc/xray/.keys | awk -F': ' '/PrivateKey/ {print $2}')
+if [ -z "$privatekey" ]; then
+    echo "Генерируем ключи для сервера"
+    xray x25519 > /usr/local/etc/xray/.keys
+    privatekey=$(cat /usr/local/etc/xray/.keys | awk -F': ' '/PrivateKey/ {print $2}')
+    if [ -z "$privatekey" ]; then
+        echo "ОШИБКА: приватный ключ не был сгенерирован"
+        exit 2
+    fi
+fi
 
 # Создаем файл конфигурации Xray, подставляя значения переменных в шаблоны
 jq --arg privatekey "$privatekey" \
@@ -61,7 +66,7 @@ jq --arg privatekey "$privatekey" \
 cp ./xray-user.py /usr/local/bin/xray-user
 
 echo "Xray-core успешно установлен"
-echo "Создайте пользователя с помощью \`xray-user -add username\`, перезапустите сервис с `sudo systemctl restart xray`"
+echo "Создайте пользователя с помощью \`xray-user -add username\`, перезапустите сервис с \`sudo systemctl restart xray\`"
 echo "Для получения ссылки и QR-кода введите \`xray-user -link username\`"
 
 
