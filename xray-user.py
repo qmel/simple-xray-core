@@ -54,7 +54,7 @@ class Inbound:
 
         sharelinks = dict()
         for i, client in enumerate(self.clients):
-            sharelink = f"{self.protocol}://{client['uuid']}@{ip}:{self.port}?security=reality&"
+            sharelink = f"{self.protocol}://{client['id']}@{ip}:{self.port}?security=reality&"
             if self.protocol == "vless":
                 # TODO: spx probably may be deleted
                 # TODO: only first sni is used
@@ -109,8 +109,8 @@ def show_users():
 def generate_user() -> dict[str, str]:
     user = dict()
     res = subprocess.run(["xray", "uuid"], check=True, capture_output=True)
-    user["uuid"] = res.stdout.decode().rstrip()
-    assert len(user["uuid"]) == 36
+    user["id"] = res.stdout.decode().rstrip()
+    assert len(user["id"]) == 36
     res = subprocess.run(["openssl", "rand", "-hex", "8"], check=True, capture_output=True)
     user["shortId"] = res.stdout.decode().rstrip()
     assert len(user["shortId"]) == 16
