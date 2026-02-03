@@ -25,13 +25,7 @@
             "port": 443,
             "protocol": "vless",
             "settings": {
-                "clients": [
-                    {
-                        "email": "main",
-                        "id": "$uuid",
-                        "flow": ""
-                    }
-                ],
+                "clients": [],
                 "decryption": "none"
             },
             "streamSettings": {
@@ -51,9 +45,7 @@
                     "minClientVer": "",
                     "maxClientVer": "",
                     "maxTimeDiff": 0,
-                    "shortIds": [
-                        "$shortsid"
-                    ]
+                    "shortIds": []
                 }
             },
             "sniffing": {
