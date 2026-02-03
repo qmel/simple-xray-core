@@ -65,7 +65,7 @@ class Inbound:
                     sharelink += f"path=%2F&host=&mode=auto&{common}type=xhttp&encryption=none"
                 else:
                     raise ValueError(f"Inbound network '{self.network}' is not supported")
-                sharelinks[client["email"]] = sharelink + f" #{hostname} {self.protocol}-{self.network}"
+                sharelinks[client["email"]] = sharelink + f"#{hostname}-{self.protocol}-{self.network}"
         return sharelinks
 
 
