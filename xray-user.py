@@ -75,10 +75,10 @@ def get_inbounds_info(xrayconfig) -> list[Inbound]:
         inbounds.append(Inbound(
             inbound["protocol"],
             inbound["port"],
-            inbound["streamSettings"]["network"],
-            inbound["streamSettings"].get("realitySettings", {}).get("serverNames", []),
-            inbound["settings"]["clients"],
-            inbound["streamSettings"].get("realitySettings", {}).get("shortIds", [])
+            inbound.get("streamSettings", {}).get("network"),
+            inbound.get("streamSettings", {}).get("realitySettings", {}).get("serverNames", []),
+            inbound["settings"].get("clients"),
+            inbound.get("streamSettings", {}).get("realitySettings", {}).get("shortIds", [])
         ))
     return inbounds
     
