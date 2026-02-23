@@ -25,8 +25,8 @@ sudo systemctl restart xray
 xray-user -link username
 ```
 Поддерживаемые протоколы
-- `vless-tcp` (Vless TCP)
-- `vless-xhttp` (Vless XHTTP)
+- `vless-tcp` (Vless TCP Reality)
+- `vless-xhttp` (Vless XHTTP Reality)
 
 **ВНИМАНИЕ!** При повторном запуске скрипта установки предыдущие ключи и пользователи сохраняются.  
 При необходимости перегенерировать ключи:
